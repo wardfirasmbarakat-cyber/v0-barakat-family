@@ -129,7 +129,7 @@ export default function Dashboard({ me }: { me: Me }) {
     mutate()
   }
 
-  const activeSource = (["school", "kindergarten", "altafran_shop"] as BusinessSource[]).includes(
+  const activeSource = (["school", "kindergarten", "altafran_shop", "home"] as BusinessSource[]).includes(
     tab as BusinessSource,
   )
     ? (tab as BusinessSource)
@@ -512,6 +512,12 @@ const ALL_SOURCES: Array<{
     label: "Altafran Shop",
     icon: BUSINESS_ICONS.altafran_shop,
     colors: BUSINESS_COLORS.altafran_shop,
+  },
+  {
+    id: "home",
+    label: "Home",
+    icon: BUSINESS_ICONS.home,
+    colors: BUSINESS_COLORS.home,
   },
 ]
 
