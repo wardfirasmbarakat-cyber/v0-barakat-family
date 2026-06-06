@@ -19,11 +19,16 @@ import {
   markRead,
   clearAllTransactions,
   clearAllMessages,
+  addRecurring,
+  deleteRecurring,
+  getRecurring,
   type Txn,
   type Msg,
   type TxnSource,
+  type Recurring,
 } from "@/app/actions"
 import AddModal from "@/components/add-modal"
+import AiAccountant from "@/components/ai-accountant"
 
 type Me = {
   name: string
@@ -70,10 +75,17 @@ export default function Dashboard({ me }: { me: Me }) {
   const [tab, setTab] = useState("transactions")
   const [modalOpen, setModalOpen] = useState(false)
   const [modalSource, setModalSource] = useState<TxnSource>("family")
+  const [recurring, setRecurring] = useState<Recurring[]>([])
+
+  useEffect(() => {
+    getRecurring().then(setRecurring).catch(() => {})
+  }, [])
 
   const tabs = useMemo(() => {
     const t = [
       { id: "transactions", label: "Transactions", icon: "ti-list" },
+      { id: "recurring", label: "Recurring", icon: "ti-refresh" },
+      { id: "ai", label: "AI", icon: "ti-robot" },
       { id: "members", label: "Members", icon: "ti-users" },
     ]
     for (const src of businessAccess) {
@@ -255,6 +267,26 @@ export default function Dashboard({ me }: { me: Me }) {
 
       {tab === "messages" && isWard && (
         <WardMessages messages={messages} onChange={() => mutate()} />
+      )}
+
+      {tab === "ai" && (
+        <AiAccountant memberName={me.name} />
+      )}
+
+      {tab === "recurring" && (
+        <RecurringPanel
+          recurring={recurring}
+          me={me}
+          onAdd={async (input) => {
+            await addRecurring(input)
+            const updated = await getRecurring()
+            setRecurring(updated)
+          }}
+          onDelete={async (id) => {
+            await deleteRecurring(id)
+            setRecurring((prev) => prev.filter((r) => r.id !== id))
+          }}
+        />
       )}
 
       {tab === "admin" && isAdmin && (
@@ -803,6 +835,171 @@ function WardMessages({ messages, onChange }: { messages: Msg[]; onChange: () =>
         <button className="msg-send-btn" onClick={send} aria-label="Send">
           <i className="ti ti-send" />
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Recurring panel ──────────────────────────────────────────────────────────
+
+const FREQ_LABELS: Record<string, string> = {
+  daily: "يومياً",
+  weekly: "أسبوعياً",
+  monthly: "شهرياً",
+  yearly: "سنوياً",
+}
+
+function RecurringPanel({
+  recurring,
+  me,
+  onAdd,
+  onDelete,
+}: {
+  recurring: Recurring[]
+  me: Me
+  onAdd: (input: {
+    type: "income" | "expense"; description: string; amount: number;
+    category: string; source?: TxnSource; frequency: Recurring["frequency"]; nextDue: string
+  }) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({
+    type: "expense" as "income" | "expense",
+    description: "",
+    amount: "",
+    category: "other",
+    frequency: "monthly" as Recurring["frequency"],
+    nextDue: new Date().toISOString().slice(0, 10),
+  })
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!form.description.trim() || !form.amount) return
+    setSaving(true)
+    await onAdd({
+      type: form.type,
+      description: form.description,
+      amount: Number(form.amount),
+      category: form.category,
+      frequency: form.frequency,
+      nextDue: form.nextDue,
+    })
+    setShowForm(false)
+    setForm({ type: "expense", description: "", amount: "", category: "other", frequency: "monthly", nextDue: new Date().toISOString().slice(0, 10) })
+    setSaving(false)
+  }
+
+  return (
+    <div>
+      <div className="section-head">
+        <div className="section-title">المدفوعات المتكررة</div>
+        <button className="add-btn" onClick={() => setShowForm(true)}>
+          <i className="ti ti-plus" /> Add
+        </button>
+      </div>
+
+      {showForm && (
+        <div
+          style={{
+            background: "var(--surface2)",
+            borderRadius: 14,
+            padding: "16px",
+            marginBottom: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", gap: 8 }}>
+            {(["expense", "income"] as const).map((t) => (
+              <button
+                key={t}
+                style={{
+                  flex: 1, padding: "8px 0", borderRadius: 10, border: "none", cursor: "pointer",
+                  background: form.type === t ? (t === "income" ? "var(--brand)" : "var(--accent)") : "var(--border)",
+                  color: form.type === t ? "#fff" : "var(--text2)", fontWeight: 600, fontSize: 13,
+                }}
+                onClick={() => setForm((f) => ({ ...f, type: t }))}
+              >
+                {t === "income" ? "دخل" : "مصروف"}
+              </button>
+            ))}
+          </div>
+          <input
+            className="field input"
+            placeholder="الوصف"
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            style={{ direction: "rtl" }}
+          />
+          <input
+            className="field input"
+            type="number"
+            placeholder="المبلغ (JD)"
+            value={form.amount}
+            onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+          />
+          <select
+            className="field input"
+            value={form.frequency}
+            onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value as Recurring["frequency"] }))}
+          >
+            <option value="daily">يومياً</option>
+            <option value="weekly">أسبوعياً</option>
+            <option value="monthly">شهرياً</option>
+            <option value="yearly">سنوياً</option>
+          </select>
+          <div style={{ fontSize: 12, color: "var(--text3)" }}>الاستحقاق القادم</div>
+          <input
+            className="field input"
+            type="date"
+            value={form.nextDue}
+            onChange={(e) => setForm((f) => ({ ...f, nextDue: e.target.value }))}
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="primary-btn" disabled={saving} style={{ flex: 1 }} onClick={handleSave}>
+              {saving ? "جارٍ الحفظ…" : "حفظ"}
+            </button>
+            <button
+              style={{ flex: 1, padding: "10px 0", borderRadius: 12, border: "0.5px solid var(--border)", background: "none", cursor: "pointer", color: "var(--text2)", fontSize: 14 }}
+              onClick={() => setShowForm(false)}
+            >
+              إلغاء
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="txn-list">
+        {recurring.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">🔄</div>
+            لا توجد مدفوعات متكررة. اضغط Add للإضافة.
+          </div>
+        ) : (
+          recurring.map((r) => (
+            <div key={r.id} className="txn-item">
+              <div className={"txn-icon " + r.type}>
+                <i className="ti ti-refresh" />
+              </div>
+              <div className="txn-info">
+                <div className="txn-name" style={{ direction: "rtl" }}>{r.description}</div>
+                <div className="txn-meta">
+                  {FREQ_LABELS[r.frequency] ?? r.frequency} · {r.nextDue}
+                </div>
+              </div>
+              <div className={"txn-amount " + r.type}>
+                {r.type === "income" ? "+" : "−"}{r.amount.toFixed(2)} JD
+              </div>
+              {(me.role === "admin" || r.addedBy === me.name) && (
+                <button className="txn-del" aria-label="Delete" onClick={() => onDelete(r.id)}>
+                  <i className="ti ti-trash" />
+                </button>
+              )}
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

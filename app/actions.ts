@@ -140,3 +140,66 @@ export async function clearAllMessages() {
   await query(`DELETE FROM messages WHERE true`)
   return { ok: true as const }
 }
+
+export type Recurring = {
+  id: string
+  type: "income" | "expense"
+  description: string
+  amount: number
+  category: string
+  source: TxnSource
+  addedBy: string
+  frequency: "daily" | "weekly" | "monthly" | "yearly"
+  nextDue: string
+  createdAt: string
+}
+
+export async function getRecurring(): Promise<Recurring[]> {
+  const me = await getCurrentMember()
+  if (!me) throw new Error("Unauthorized")
+  const rows = await query<{
+    id: string; type: string; description: string; amount: string; category: string;
+    source: string; added_by: string; frequency: string; next_due: string; created_at: string
+  }>(`SELECT * FROM recurring ORDER BY next_due`)
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type as "income" | "expense",
+    description: r.description,
+    amount: Number(r.amount),
+    category: r.category,
+    source: (r.source ?? "family") as TxnSource,
+    addedBy: r.added_by,
+    frequency: r.frequency as Recurring["frequency"],
+    nextDue: r.next_due,
+    createdAt: r.created_at,
+  }))
+}
+
+export async function addRecurring(input: {
+  type: "income" | "expense"
+  description: string
+  amount: number
+  category: string
+  source?: TxnSource
+  frequency: Recurring["frequency"]
+  nextDue: string
+}) {
+  const me = await getCurrentMember()
+  if (!me) throw new Error("Unauthorized")
+  const desc = input.description.trim()
+  if (!desc) throw new Error("Description required")
+  if (!(input.amount > 0)) throw new Error("Invalid amount")
+  const id = genId()
+  await query(
+    `INSERT INTO recurring (id, type, description, amount, category, added_by, source, frequency, next_due) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [id, input.type, desc, input.amount, input.category, me.name, input.source ?? "family", input.frequency, input.nextDue],
+  )
+  return { ok: true as const }
+}
+
+export async function deleteRecurring(id: string) {
+  const me = await getCurrentMember()
+  if (!me) throw new Error("Unauthorized")
+  await query(`DELETE FROM recurring WHERE id = $1`, [id])
+  return { ok: true as const }
+}

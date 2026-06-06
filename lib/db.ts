@@ -20,8 +20,22 @@ type MsgRow = {
   created_at: string
 }
 
+type RecurringRow = {
+  id: string
+  type: string
+  description: string
+  amount: number
+  category: string
+  source: string
+  added_by: string
+  frequency: string
+  next_due: string
+  created_at: string
+}
+
 const memTxns = new Map<string, TxnRow>()
 const memMsgs = new Map<string, MsgRow>()
+const memRecurring = new Map<string, RecurringRow>()
 
 function memQuery(sql: string, params: any[] = []): any[] {
   const s = sql.trim()
@@ -75,6 +89,34 @@ function memQuery(sql: string, params: any[] = []): any[] {
     return rows
   }
 
+  // ── recurring ─────────────────────────────────────────────────────────────
+  if (s.startsWith("INSERT INTO recurring")) {
+    memRecurring.set(params[0], {
+      id: params[0], type: params[1], description: params[2],
+      amount: Number(params[3]), category: params[4],
+      added_by: params[5], source: params[6] ?? "family",
+      frequency: params[7], next_due: params[8],
+      created_at: new Date().toISOString(),
+    })
+    return []
+  }
+  if (s.startsWith("DELETE FROM recurring WHERE id")) {
+    memRecurring.delete(params[0])
+    return []
+  }
+  if (s.startsWith("DELETE FROM recurring")) {
+    memRecurring.clear()
+    return []
+  }
+  if (s.startsWith("UPDATE recurring SET next_due")) {
+    const row = memRecurring.get(params[1])
+    if (row) memRecurring.set(params[1], { ...row, next_due: params[0] })
+    return []
+  }
+  if (s.startsWith("SELECT") && s.includes("FROM recurring")) {
+    return [...memRecurring.values()].sort((a, b) => a.next_due.localeCompare(b.next_due))
+  }
+
   return []
 }
 
@@ -96,9 +138,19 @@ async function runMigrations() {
   if (migrated || !pool) return
   migrated = true
   try {
-    await pool.query(
-      `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS source VARCHAR(50) NOT NULL DEFAULT 'family'`,
-    )
+    await pool.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS source VARCHAR(50) NOT NULL DEFAULT 'family'`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS recurring (
+      id VARCHAR(50) PRIMARY KEY,
+      type VARCHAR(10) NOT NULL,
+      description TEXT NOT NULL,
+      amount NUMERIC NOT NULL,
+      category VARCHAR(50),
+      added_by VARCHAR(100),
+      source VARCHAR(50) NOT NULL DEFAULT 'family',
+      frequency VARCHAR(20) NOT NULL,
+      next_due DATE NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`)
   } catch (e) {
     console.warn("Migration warning:", e instanceof Error ? e.message : e)
   }

@@ -31,6 +31,7 @@ const SOURCE_LABELS: Record<TxnSource, string> = {
   school: "School",
   kindergarten: "Kindergarten",
   altafran_shop: "Altafran Shop",
+  home: "Home",
 }
 
 export default function AddModal({ onClose, onSave, source = "family" }: Props) {
