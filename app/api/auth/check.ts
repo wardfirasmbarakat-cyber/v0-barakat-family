@@ -1,7 +1,6 @@
 import { cookies } from 'next/headers'
 import { MEMBERS } from '@/lib/members'
 
-// Verify session token
 async function verifyToken(token: string | undefined): Promise<string | null> {
   if (!token) return null
   
@@ -47,7 +46,6 @@ export async function GET(request: Request) {
       return Response.json({ member: null })
     }
 
-    // Return public member info (no password)
     return Response.json({
       member: {
         name: member.name,

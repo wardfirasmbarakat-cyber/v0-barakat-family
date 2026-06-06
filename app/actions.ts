@@ -62,7 +62,6 @@ export async function addTransaction(input: {
 
   const source: TxnSource = input.source ?? "family"
 
-  // Check business access
   if (source !== "family") {
     const memberFull = MEMBERS.find((m) => m.name === me.name)
     if (me.role !== "admin" && !memberFull?.businessAccess.includes(source as BusinessSource)) {
@@ -89,7 +88,6 @@ export async function deleteTransaction(id: string) {
   if (me.role === "admin") {
     await query(`DELETE FROM transactions WHERE id = $1`, [id])
   } else {
-    // Non-admin can delete own transactions; business managers can delete in their entities
     const rows = await query<{ added_by: string; source: string }>(
       `SELECT added_by, source FROM transactions WHERE id = $1`,
       [id],
