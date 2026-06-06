@@ -1,14 +1,17 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import type { TxnSource } from "@/app/actions"
 
 type Props = {
   onClose: () => void
+  source?: TxnSource
   onSave: (input: {
     type: "income" | "expense"
     description: string
     amount: number
     category: string
+    source: TxnSource
   }) => Promise<void>
 }
 
@@ -23,7 +26,14 @@ const CATEGORIES = [
   { value: "other", label: "Other" },
 ]
 
-export default function AddModal({ onClose, onSave }: Props) {
+const SOURCE_LABELS: Record<TxnSource, string> = {
+  family: "Family",
+  school: "School",
+  kindergarten: "Kindergarten",
+  altafran_shop: "Altafran Shop",
+}
+
+export default function AddModal({ onClose, onSave, source = "family" }: Props) {
   const [type, setType] = useState<"income" | "expense">("expense")
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
@@ -57,7 +67,7 @@ export default function AddModal({ onClose, onSave }: Props) {
     setError("")
     setBusy(true)
     try {
-      await onSave({ type, description: d, amount: a, category })
+      await onSave({ type, description: d, amount: a, category, source })
     } catch {
       setError("Something went wrong. Please try again.")
       setBusy(false)
@@ -73,7 +83,14 @@ export default function AddModal({ onClose, onSave }: Props) {
     >
       <div className="modal-card">
         <div className="modal-handle" />
-        <div className="modal-title">Add transaction</div>
+        <div className="modal-title">
+          Add transaction
+          {source !== "family" && (
+            <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text2)", marginLeft: 6 }}>
+              · {SOURCE_LABELS[source]}
+            </span>
+          )}
+        </div>
 
         <div className="type-toggle">
           <button
