@@ -1,32 +1,47 @@
-import { getCurrentMember } from "@/lib/session"
-import { PUBLIC_MEMBERS } from "@/lib/members"
-import LoginScreen from "@/components/login-screen"
-import Dashboard from "@/components/dashboard"
+'use client'
 
-export const dynamic = "force-dynamic"
-export const revalidate = 0
+import { useEffect, useState } from 'react'
+import { PUBLIC_MEMBERS } from '@/lib/members'
+import LoginScreen from '@/components/login-screen'
+import Dashboard from '@/components/dashboard'
 
-export default async function Page() {
-  try {
-    const me = await getCurrentMember()
+export default function Page() {
+  const [member, setMember] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/check')
+        if (res.ok) {
+          const data = await res.json()
+          setMember(data.member)
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAuth()
+  }, [])
+
+  if (loading) {
     return (
-      <div className="app">
-        {me ? (
-          <Dashboard
-            me={{ name: me.name, role: me.role, color: me.color, textColor: me.textColor, initials: me.initials }}
-          />
-        ) : (
-          <LoginScreen members={PUBLIC_MEMBERS} />
-        )}
-      </div>
-    )
-  } catch (error) {
-    console.error("Page error:", error)
-    return (
-      <div className="app">
-        <LoginScreen members={PUBLIC_MEMBERS} />
+      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>Loading...</div>
       </div>
     )
   }
+
+  return (
+    <div className="app">
+      {member ? (
+        <Dashboard me={member} />
+      ) : (
+        <LoginScreen members={PUBLIC_MEMBERS} />
+      )}
+    </div>
+  )
 }
