@@ -52,9 +52,16 @@ export default function AiAccountant({ memberName }: { memberName: string }) {
       })
 
       if (!res.ok || !res.body) {
+        let errMsg = "عذراً، حدث خطأ. يرجى المحاولة مجدداً."
+        try {
+          const errJson = await res.clone().json()
+          if (errJson?.error?.includes("ANTHROPIC_API_KEY")) {
+            errMsg = "⚠️ مفتاح ANTHROPIC_API_KEY غير مضبوط. أضفه إلى ملف .env.local لتشغيل المحاسب الذكي."
+          }
+        } catch {}
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: "عذراً، حدث خطأ. يرجى المحاولة مجدداً." },
+          { role: "assistant", content: errMsg },
         ])
         setBusy(false)
         return

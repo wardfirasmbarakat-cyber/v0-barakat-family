@@ -2,11 +2,15 @@ import { getCurrentMember } from "@/lib/session"
 import { query } from "@/lib/db"
 import Anthropic from "@anthropic-ai/sdk"
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 export async function POST(req: Request) {
   const me = await getCurrentMember()
   if (!me) return Response.json({ error: "Unauthorized" }, { status: 401 })
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return Response.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 })
+  }
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   const { message, history } = await req.json()
 
