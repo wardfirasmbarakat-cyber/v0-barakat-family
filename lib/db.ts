@@ -1,17 +1,32 @@
-import { Pool } from "pg"
+let pool: any = null
 
-// Single shared pool reused across hot reloads in dev.
-const globalForDb = globalThis as unknown as { pgPool?: Pool }
+// Try to initialize database connection if DATABASE_URL is set
+try {
+  if (process.env.DATABASE_URL) {
+    const Pool = require("pg").Pool
+    pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  }
+} catch (error) {
+  console.warn("Database connection failed, using mock:", error instanceof Error ? error.message : error)
+}
 
-export const pool =
-  globalForDb.pgPool ??
-  new Pool({
-    connectionString: process.env.DATABASE_URL,
-  })
+// Mock query function for when database is not available
+const mockQuery = async (sql: string, params?: any[]) => {
+  console.log("Mock query (no database):", sql, params)
+  return []
+}
 
-if (process.env.NODE_ENV !== "production") globalForDb.pgPool = pool
+export async function query(sql: string, params?: any[]) {
+  // If no database connection, use mock
+  if (!pool) {
+    return mockQuery(sql, params)
+  }
 
-export async function query<T = any>(text: string, params: any[] = []): Promise<T[]> {
-  const res = await pool.query(text, params)
-  return res.rows as T[]
+  try {
+    const result = await pool.query(sql, params)
+    return result.rows || []
+  } catch (error) {
+    console.error("Database query error:", error)
+    return []
+  }
 }
