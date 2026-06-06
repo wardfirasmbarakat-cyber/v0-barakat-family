@@ -85,7 +85,6 @@ export default function Dashboard({ me }: { me: Me }) {
     const t = [
       { id: "transactions", label: "Transactions", icon: "ti-list" },
       { id: "recurring", label: "Recurring", icon: "ti-refresh" },
-      { id: "ai", label: "AI", icon: "ti-robot" },
       { id: "members", label: "Members", icon: "ti-users" },
     ]
     for (const src of businessAccess) {
