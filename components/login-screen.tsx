@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import type { PublicMember } from "@/lib/members"
-import { login, loginByName } from "@/app/actions"
+import { login } from "@/app/actions"
 
 export default function LoginScreen({ members }: { members: PublicMember[] }) {
   const router = useRouter()
@@ -12,6 +12,7 @@ export default function LoginScreen({ members }: { members: PublicMember[] }) {
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [showIosHint, setShowIosHint] = useState(false)
+  const passwordRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const ua = navigator.userAgent
@@ -20,15 +21,11 @@ export default function LoginScreen({ members }: { members: PublicMember[] }) {
     if (isIOS && !standalone) setShowIosHint(true)
   }, [])
 
-  async function handleMemberTap(name: string) {
+  function handleMemberTap(m: PublicMember) {
+    setEmail(m.email)
+    setPassword("")
     setError("")
-    setBusy(true)
-    const res = await loginByName(name)
-    if (res.ok) router.refresh()
-    else {
-      setError(res.error)
-      setBusy(false)
-    }
+    setTimeout(() => passwordRef.current?.focus(), 50)
   }
 
   async function handleSubmit() {
@@ -60,15 +57,15 @@ export default function LoginScreen({ members }: { members: PublicMember[] }) {
             </div>
           </div>
 
-          <div className="hint-text">Tap your name to sign in</div>
+          <div className="hint-text">Tap your name, then enter your password</div>
           <div className="member-btns">
             {members.map((m) => (
               <button
                 key={m.name}
                 type="button"
                 disabled={busy}
-                className={"member-btn" + (m.role === "admin" ? " admin-btn" : "")}
-                onClick={() => handleMemberTap(m.name)}
+                className={"member-btn" + (m.role === "admin" ? " admin-btn" : "") + (email === m.email ? " selected" : "")}
+                onClick={() => handleMemberTap(m)}
               >
                 <div className="avatar-lg" style={{ background: m.color, color: m.textColor }}>
                   {m.initials}
@@ -78,8 +75,6 @@ export default function LoginScreen({ members }: { members: PublicMember[] }) {
               </button>
             ))}
           </div>
-
-          <div className="divider">or sign in with email</div>
 
           {error && <div className="error-box">{error}</div>}
 
@@ -98,6 +93,7 @@ export default function LoginScreen({ members }: { members: PublicMember[] }) {
             <label htmlFor="l-pass">Password</label>
             <input
               id="l-pass"
+              ref={passwordRef}
               type="password"
               placeholder="••••••••"
               value={password}
