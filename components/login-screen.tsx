@@ -36,7 +36,7 @@ export default function LoginScreen({ members }: { members: PublicMember[] }) {
     setError("")
     setBusy(true)
     const res = await login(email, password)
-    if (res.ok) router.refresh()
+    if (res.ok) window.location.reload()
     else {
       setError(res.error)
       setBusy(false)
