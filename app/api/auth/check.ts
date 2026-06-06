@@ -55,6 +55,7 @@ export async function GET(request: Request) {
         color: member.color,
         textColor: member.textColor,
         initials: member.initials,
+        businessAccess: member.businessAccess,
       },
     })
   } catch (error) {

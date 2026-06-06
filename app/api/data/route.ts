@@ -16,10 +16,11 @@ export async function GET() {
     description: string
     amount: string
     category: string
+    source: string
     added_by: string
     created_at: string
   }>(
-    `SELECT id, type, description, amount, category, added_by, created_at FROM transactions ORDER BY created_at ASC`,
+    `SELECT id, type, description, amount, category, source, added_by, created_at FROM transactions ORDER BY created_at ASC`,
   )
 
   const transactions = txnRows.map((r) => ({
@@ -28,6 +29,7 @@ export async function GET() {
     description: r.description,
     amount: Number(r.amount),
     category: r.category,
+    source: r.source ?? "family",
     addedBy: r.added_by,
     createdAt: r.created_at,
   }))
@@ -51,7 +53,6 @@ export async function GET() {
       createdAt: r.created_at,
     }))
   } else {
-    // Members only see messages addressed to them or to Everyone.
     const rows = await query<{
       id: string
       from_member: string

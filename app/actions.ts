@@ -2,7 +2,9 @@
 
 import { query } from "@/lib/db"
 import { getCurrentMember, setSession, clearSession } from "@/lib/session"
-import { MEMBERS } from "@/lib/members"
+import { MEMBERS, type BusinessSource } from "@/lib/members"
+
+export type TxnSource = "family" | BusinessSource
 
 export type Txn = {
   id: string
@@ -10,6 +12,7 @@ export type Txn = {
   description: string
   amount: number
   category: string
+  source: TxnSource
   addedBy: string
   createdAt: string
 }
@@ -52,16 +55,29 @@ export async function addTransaction(input: {
   description: string
   amount: number
   category: string
+  source?: TxnSource
 }) {
   const me = await getCurrentMember()
   if (!me) throw new Error("Unauthorized")
+
+  const source: TxnSource = input.source ?? "family"
+
+  // Check business access
+  if (source !== "family") {
+    const memberFull = MEMBERS.find((m) => m.name === me.name)
+    if (me.role !== "admin" && !memberFull?.businessAccess.includes(source as BusinessSource)) {
+      throw new Error("Unauthorized for this entity")
+    }
+  }
+
   const desc = input.description.trim()
   if (!desc) throw new Error("Description required")
   if (!(input.amount > 0)) throw new Error("Invalid amount")
+
   const id = genId()
   await query(
-    `INSERT INTO transactions (id, type, description, amount, category, added_by) VALUES ($1,$2,$3,$4,$5,$6)`,
-    [id, input.type, desc, input.amount, input.category, me.name],
+    `INSERT INTO transactions (id, type, description, amount, category, added_by, source) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [id, input.type, desc, input.amount, input.category, me.name, source],
   )
   return { ok: true as const }
 }
@@ -69,11 +85,23 @@ export async function addTransaction(input: {
 export async function deleteTransaction(id: string) {
   const me = await getCurrentMember()
   if (!me) throw new Error("Unauthorized")
-  // Admin can delete any; members can delete only their own.
+
   if (me.role === "admin") {
     await query(`DELETE FROM transactions WHERE id = $1`, [id])
   } else {
-    await query(`DELETE FROM transactions WHERE id = $1 AND added_by = $2`, [id, me.name])
+    // Non-admin can delete own transactions; business managers can delete in their entities
+    const rows = await query<{ added_by: string; source: string }>(
+      `SELECT added_by, source FROM transactions WHERE id = $1`,
+      [id],
+    )
+    if (rows.length === 0) return { ok: true as const }
+    const row = rows[0]
+    const memberFull = MEMBERS.find((m) => m.name === me.name)
+    const canManage =
+      row.added_by === me.name ||
+      (row.source !== "family" && memberFull?.businessAccess.includes(row.source as BusinessSource))
+    if (!canManage) throw new Error("Unauthorized")
+    await query(`DELETE FROM transactions WHERE id = $1`, [id])
   }
   return { ok: true as const }
 }
@@ -81,7 +109,6 @@ export async function deleteTransaction(id: string) {
 export async function sendMessage(to: string, text: string) {
   const me = await getCurrentMember()
   if (!me) throw new Error("Unauthorized")
-  // Only Ward sends messages in this app.
   if (me.name !== "Ward") throw new Error("Unauthorized")
   const t = text.trim()
   if (!t) throw new Error("Empty message")
